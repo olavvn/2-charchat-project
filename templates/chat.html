@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>챗봇 {{ bot_name }}와 대화하기</title>
+  <!-- 구글 폰트 등 외부 링크 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap" rel="stylesheet">
+
+  <!-- 공통 CSS -->
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    body {
+      font-family: 'IBM Plex Sans KR', sans-serif;
+      background: #f7f7f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* 전체 자식 요소 중앙 정렬 */
+    }
+    /* 헤더 스타일 */
+    .header {
+      width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #e8dff5;
+      padding: 10px 20px;
+      box-sizing: border-box;
+    }
+    .header-left img {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    .header-center {
+      flex: 1;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #333;
+    }
+    .close-btn {
+      font-size: 1.2rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #333;
+    }
+
+    /* 채팅 영역 */
+    .chat-area {
+      width: 100%;
+      max-width: 900px;
+      height: 600px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      box-sizing: border-box;
+      position: relative;
+      
+      /* bot_id, bot_image_url 정보를 data 속성으로 넘겨두면
+         JS 파일에서 자유롭게 읽어올 수 있습니다. */
+    }
+    #chat-log {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 15px;
+      background: #fafafa;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      /* 높이를 별도로 지정하지 않아도, 부모(.chat-area)의 높이
+         내에서 자연스럽게 차지됩니다. */
+    }
+    .message {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+    .message.user {
+      background: #e6f7ff;
+      text-align: right;
+      color: #0056b3;
+    }
+    .message.bot {
+      color: #333;
+      word-break: break-all;
+    }
+    .bot-text {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .bot-big-img {
+      display: block;
+      width: 100%;
+      max-width: 300px;
+      height: auto;
+      margin: 0 auto 8px;
+      border-radius: 8px;
+    }
+    /* 채팅 입력 영역 */
+    .chat-input-area {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .chat-input-area input[type="text"] {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    .chat-input-area button.send-btn {
+      padding: 8px 16px;
+      border: none;
+      background: #9264d1;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .chat-input-area button.send-btn:hover {
+      background: #9264d1;
+    }
+    /* 미디어 버튼: 채팅 입력 영역 밖, 왼쪽에 절대 위치 */
+    .media-buttons {
+      position: absolute;
+      left: -50px;  /* 왼쪽으로 튀어나오도록 */
+      bottom: 70px; /* 채팅 입력 영역 위로 위치 조정 (기존 20px에서 변경) */
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .media-buttons button {
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+    .media-buttons button img {
+      width: 30px;
+      height: 30px;
+    }
+
+    /* Modal 공통 스타일 */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 2% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 1000px;
+      border-radius: 12px;
+      position: relative;
+    }
+    .modal-content h2 {
+      margin-top: 0;
+      margin-bottom: 5px;
+    }
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: rgba(0,0,0,0.5);
+    }
+    /* 이미지 갤러리 그리드 (4열) */
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .image-grid img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 헤더 -->
+  <header class="header">
+    <div class="header-left">
+      <img src="{{ url_for('static', filename='images/club_logo.png') }}" alt="동아리 로고">
+    </div>
+    <div class="header-center">
+      {{ bot_name }}
+    </div>
+    <div class="header-right">
+      <button class="close-btn" onclick="window.location.href='{{ url_for('index') }}'">x</button>
+    </div>
+  </header>
+  
+  <!-- 채팅 영역 (데이터 속성에 bot_id 등 전달) -->
+  <div class="chat-area" 
+       data-bot-id="{{ bot_id }}"
+       data-bot-image-url="{{ url_for('static', filename='images/laughing.png') }}">
+       
+    <div id="chat-log"></div>
+
+    <!-- 채팅 입력 영역 -->
+    <div class="chat-input-area">
+      <input type="text" id="user-message" placeholder="메시지를 입력하세요" required>
+      <button class="send-btn" id="send-btn">전송</button>
+    </div>
+
+    <!-- 미디어 버튼 -->
+    <div class="media-buttons">
+      <button id="imageBtn">
+        <img src="{{ url_for('static', filename='images/image-icon.png') }}" alt="그림">
+      </button>
+      <button id="videoBtn">
+        <img src="{{ url_for('static', filename='images/video-icon.png') }}" alt="영상">
+      </button>
+    </div>
+  </div>
+  
+  <!-- Video Modal -->
+  <div id="videoModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" data-close-modal="videoModal">&times;</button>
+      <h2>영상 보기</h2>
+      <video controls style="width:100%; border-radius:8px; margin-top: 20px;">
+        <source src="{{ url_for('static', filename='videos/chatbot1/chatbot1-video.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+  
+  <!-- Image Gallery Modal -->
+  <div id="imageModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" data-close-modal="imageModal">&times;</button>
+      <h2>그림 보기</h2>
+      <div class="image-grid">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery1.png') }}" alt="Gallery 1">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery2.png') }}" alt="Gallery 2">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery3.png') }}" alt="Gallery 3">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery4.png') }}" alt="Gallery 4">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery5.png') }}" alt="Gallery 5">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery6.png') }}" alt="Gallery 6">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery7.png') }}" alt="Gallery 7">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery8.png') }}" alt="Gallery 8">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery9.png') }}" alt="Gallery 9">
+        <img src="{{ url_for('static', filename='images/chatbot1/gallery10.png') }}" alt="Gallery 10">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // URL 파라미터 읽기
+    const urlParams = new URLSearchParams(window.location.search);
+    const botId = urlParams.get('bot_id') || '1';
+
+    // 로드할 JS 파일 결정
+    let jsFileName = 'chatbot_default.js';
+    if (botId === '1') {
+      jsFileName = 'chatbot1.js';
+    } else if (botId === '2') {
+      jsFileName = 'chatbot2.js';
+    } else if (botId === '3') {
+      jsFileName = 'chatbot3.js';
+    } else if (botId === '4') {
+      jsFileName = 'chatbot4.js';
+    }
+
+    // <script> 태그 동적으로 생성
+    const scriptTag = document.createElement('script');
+    scriptTag.src = `/static/js/${jsFileName}`;
+    document.body.appendChild(scriptTag);
+  </script>
+</body>
+</html>

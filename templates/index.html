@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>캐릭터 챗봇</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'IBM Plex Sans KR', sans-serif;
+      background: #f7f7f7;
+    }
+    /* 상단 헤더 */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #e8dff5;
+      padding: 10px 20px;
+    }
+    .header-left img {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+    .header-center {
+      flex: 1;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #333;
+    }
+    .header-right a {
+      text-decoration: none;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #333;
+    }
+    /* 배너 영역 */
+    .banner-container {
+      margin: 20px auto;
+      width: 90%;
+      max-width: 900px;
+    }
+    .banner-container img {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      display: block;
+    }
+    /* 챗봇 카드 그리드: 한 줄에 4개 */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      max-width: 900px;
+      margin: 20px auto 40px;
+      padding: 0 20px;
+    }
+    .card {
+      background: #fff;
+      text-align: center;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 15px;
+      text-decoration: none;
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    .card img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+    .card h2 {
+      margin-top: 10px;
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
+    /* 태그 스타일 */
+    .tags {
+      margin-top: 8px;
+      text-align: center;
+    }
+    .tag {
+      display: inline-block;
+      background-color: #e0e0e0;
+      color: #555;
+      padding: 4px 8px;
+      border-radius: 12px;
+      margin: 2px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- 상단 헤더 -->
+  <header class="header">
+    <div class="header-left">
+      <img src="{{ url_for('static', filename='images/club_logo.png') }}" alt="동아리 로고">
+    </div>
+    <div class="header-center">
+      캐릭터 챗봇
+    </div>
+    <div class="header-right">
+      <a href="#">버그 제보</a>
+    </div>
+  </header>
+
+  <!-- 동아리 배너 영역 -->
+  <div class="banner-container">
+    <img src="{{ url_for('static', filename='images/club_banner.png') }}" alt="동아리 배너">
+  </div>
+
+  <!-- 챗봇 카드 그리드 -->
+  <div class="grid">
+    {% for bot in chatbots %}
+    <a href="{{ url_for('detail', bot_id=bot.id) }}" class="card">
+      <img src="{{ bot.image }}" alt="{{ bot.name }}">
+      <h2>{{ bot.name }}</h2>
+      <div class="tags">
+        {% for tag in bot.tags %}
+        <span class="tag">{{ tag }}</span>
+        {% endfor %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</body>
+</html>
