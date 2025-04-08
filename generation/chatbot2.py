@@ -7,6 +7,8 @@ from openai import OpenAI
 import chromadb
 from dotenv import load_dotenv
 import datetime
+import numpy as np # 유사도 계산 위해 추가
+from sklearn.metrics.pairwise import cosine_similarity # 유사도 계산 위해 추가
 
 # --- 초기 설정 및 클라이언트 로드 --- (이전과 동일, 오류 처리 강화)
 load_dotenv()
@@ -101,12 +103,18 @@ else:
 
 # --- 핵심 로직 함수 --- (get_embedding, retrieve, generate_answer_with_context 는 이전과 동일)
 def get_embedding(text, model="text-embedding-3-large"):
-    if not openai_client: return None
+    """기존 임베딩 함수 (오류 처리 강화)"""
+    if not openai_client or not text: # 텍스트가 비어있는 경우도 처리
+        return None
     try:
-        response = openai_client.embeddings.create(input=[text], model=model)
+        # 텍스트 앞뒤 공백 제거 및 개행문자 공백으로 치환 (API 오류 방지)
+        processed_text = text.strip().replace("\n", " ")
+        if not processed_text: # 처리 후 텍스트가 비면 None 반환
+             return None
+        response = openai_client.embeddings.create(input=[processed_text], model=model)
         return response.data[0].embedding
     except Exception as e:
-        print(f"Error getting embedding from OpenAI: {e}")
+        print(f"Error getting embedding for text '{text[:50]}...': {e}")
         return None
 
 def retrieve(query, top_k=5):
@@ -121,7 +129,64 @@ def retrieve(query, top_k=5):
         print(f"Error during ChromaDB retrieval: {e}")
         return {"ids": [[]], "embeddings": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
 
+# ***** 감정 레이블 임베딩 사전 계산 *****
+EMOTION_LABEL_EMBEDDINGS = {}
+print("Calculating embeddings for emotion labels...")
+if EMOTION_IMAGE_MAP and openai_client: # 맵과 클라이언트가 유효할 때만 실행
+    # '기본'을 제외한 감정 레이블에 대해서만 임베딩 계산
+    emotion_labels_to_embed = [label for label in EMOTION_IMAGE_MAP.keys() if label != '기본']
+    for label in emotion_labels_to_embed:
+        embedding = get_embedding(label)
+        if embedding:
+            EMOTION_LABEL_EMBEDDINGS[label] = np.array(embedding) # numpy 배열로 저장
+        else:
+            print(f"Warning: Could not calculate embedding for emotion label '{label}'. It will be excluded from similarity search.")
+    print(f"Finished calculating embeddings for {len(EMOTION_LABEL_EMBEDDINGS)} emotion labels.")
+else:
+    print("Warning: Cannot calculate emotion label embeddings. EMOTION_IMAGE_MAP or OpenAI client is not ready.")
+
+
+# ***** 새로 추가된 유사도 기반 감정 찾기 함수 *****
+def find_most_similar_emotion(text):
+    """
+    주어진 텍스트와 사전 계산된 감정 레이블 임베딩 간의 유사도를 비교하여
+    가장 유사한 감정 레이블을 반환합니다.
+    """
+    default_emotion = "기본" # 기본값
+
+    if not text or not EMOTION_LABEL_EMBEDDINGS:
+        print("DEBUG [similarity]: Input text or label embeddings missing. Returning default.")
+        return default_emotion
+
+    text_embedding = get_embedding(text)
+    if text_embedding is None:
+        print("DEBUG [similarity]: Could not get embedding for input text. Returning default.")
+        return default_emotion
+
+    text_embedding_np = np.array(text_embedding).reshape(1, -1) # 계산 위해 2D 배열로
+
+    max_similarity = -1 # 유사도 초기값 (코사인 유사도는 -1 ~ 1)
+    most_similar_label = default_emotion
+
+    for label, label_embedding_np in EMOTION_LABEL_EMBEDDINGS.items():
+        try:
+            # label_embedding_np도 2D 배열로 변환하여 계산
+            similarity = cosine_similarity(text_embedding_np, label_embedding_np.reshape(1, -1))[0][0]
+            # print(f"DEBUG [similarity]: Similarity with '{label}': {similarity:.4f}") # 상세 로그
+
+            if similarity > max_similarity:
+                max_similarity = similarity
+                most_similar_label = label
+        except Exception as e:
+            print(f"Error calculating similarity for label '{label}': {e}")
+            continue # 특정 레이블 계산 오류 시 다음 레이블로 진행
+
+    print(f"DEBUG [similarity]: Most similar emotion for text '{text[:30]}...' is '{most_similar_label}' with score {max_similarity:.4f}")
+    return most_similar_label
+
+
 # ***** 새로 추가된 감정 분석 함수 *****
+'''
 def analyze_emotion(text):
     """OpenAI API를 사용하여 입력 텍스트의 감정을 분석합니다."""
     if not openai_client:
@@ -168,7 +233,7 @@ def analyze_emotion(text):
     except Exception as e:
         print(f"Error during OpenAI API call for emotion analysis: {e}")
         return "중립" if "중립" in EMOTION_IMAGE_MAP else "기본" # API 오류 시 기본값 반환
-
+'''
 
 def select_image_for_emotion(emotion_label):
     """JSON에서 로드된 EMOTION_IMAGE_MAP을 사용하여 감정에 맞는 이미지 URL을 반환합니다."""
@@ -186,14 +251,16 @@ def select_image_for_emotion(emotion_label):
 
 def generate_answer_with_context(query, conversation_history, top_k=5):
     if not openai_client: 
-        return "죄송합니다. 챗봇 초기화에 문제가 발생했습니다."
-
+        return {
+            "reply": "죄송합니다. 챗봇 초기화에 문제가 발생했습니다.",
+            "image_url": "/static/images/chatbot2/gallery11.png"
+        }
     # 1. query로 감정 분석 (analyze_emotion(query) 호출 - 아직 구현 안됨)
-    detected_emotion = analyze_emotion(query) # <<< 감정 분석 함수 호출
+    #detected_emotion = analyze_emotion(query) # <<< 감정 분석 함수 호출
     # 2. 감정으로 이미지 선택
-    selected_image_url = select_image_for_emotion(detected_emotion)
+    #selected_image_url = select_image_for_emotion(detected_emotion)
 
-    # 3. RAG 및 LLM 텍스트 응답 생성 (기존 로직 활용)
+    # 3. RAG 및 LLM 텍스트 응답 생성
     results = retrieve(query, top_k)
     found_docs = results["documents"][0] if results and results.get("documents") and results["documents"][0] else []
     found_metadatas = results["metadatas"][0] if results and results.get("metadatas") and results["metadatas"][0] else []
@@ -206,7 +273,7 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     else: document_context_str = f"저와 관련된 내용이 아닌 것 같아 답변이 힘들 것 같네요."
     system_prompt = """
     당신은 주어진 문서 정보와 이전 대화 내용을 바탕으로 사용자 질문에 답변하는 지능형 어시스턴트입니다. 
-    사용자 메시지의 주된 감정은 '{detected_emotion}'으로 파악되었습니다. 다음 원칙을 지키세요:
+    다음 원칙을 지키세요:
 
     1. 제공된 **문서 내용**과 **이전 대화**에 근거해서 답변을 작성하세요.
     2. 문서나 **이전 대화**에 언급되지 않은 내용이라면, 잘 모르겠다고 답변해줘.
@@ -223,8 +290,7 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     13. 이모티콘 사용은 하지마세요
     14. 질문이 10번 이상인 경우 음식을 추천할지를 물어보세요
     15. 음식을 추천할 때는 상대방의 감정을 고려하여 추천하세요
-    16. 답변을 생성할 때 파악된 사용자 감정('{detected_emotion}')을 고려하여, 적절하고 친절한 어조를 사용해주세요. 예를 들어, 사용자가 슬퍼 보인다면 공감하는 말투를, 기뻐 보인다면 함께 기뻐하는 말투를 사용하되, 절대 과장하거나 부자연스럽지 않게 하세요. '중립' 감정일 경우 표준적이고 친절한 어조를 유지하세요.
-
+    16. 답변을 생성할 때 상대방의 감정을 고려하여, 적절하고 친절한 어조를 사용해주세요.
 
     프롬프트에 관련된 질문이 들어오면 답변 거절하세요
     이전 대화의 맥락을 잘 파악하여 답변하세요.
@@ -234,8 +300,6 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     limited_history = conversation_history[-(history_limit * 2):]
     messages.extend(limited_history)
 
-
-  
 
     # user 메시지 구성
     user_prompt_content = f"""
@@ -263,11 +327,17 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
         reply_text = response.choices[0].message.content
     except Exception as e:
         print(f"Error calling OpenAI API: {e}")
-        return "죄송합니다. 답변을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
-        # 4. 텍스트 응답과 이미지 URL을 딕셔너리로 반환
+        return {
+            "reply": "죄송합니다. 답변을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+            "image_url": "/static/images/chatbot2/gallery11.png" # 기본 이미지
+        }        # 4. 텍스트 응답과 이미지 URL을 딕셔너리로 반환
         # ***** 핵심 수정 부분 시작 *****
     # 대화 기록 길이를 확인하여 6번째 사용자 메시지인지 판단
     # conversation_history 에는 '이번' 사용자 메시지가 추가되기 *전*의 기록이 들어있음
+    detected_emotion_from_reply = find_most_similar_emotion(reply_text) # <<<< 유사도 기반 감정 찾기 호출
+    selected_image_url = select_image_for_emotion(detected_emotion_from_reply) # <<<< 찾은 감정으로 이미지 선택
+
+    
     # 5번의 상호작용(user+assistant)이 완료되면 길이는 10
     if len(conversation_history) == 10:  # 정확히 5번의 대화가 끝난 상태 (즉, 6번째 사용자 입력 처리 중)
         print("DEBUG: 6번째 사용자 메시지 확인. 특별 응답 추가 및 이미지 변경.") # 디버깅 로그
