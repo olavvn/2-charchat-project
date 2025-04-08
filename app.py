@@ -18,9 +18,9 @@ def index():
         },
         {
             'id': 2,
-            'name': 'chatbot2',
-            'image': url_for('static', filename='images/chatbot2/thumbnail.png'),
-            'tags': ['#챗봇', '#유머', '#일상']
+            'name': '심야식당',
+            'image': url_for('static', filename='images/chatbot2/기본 웃음.png'),
+            'tags': ['#챗봇', '#식당', '#상담']
         },
         {
             'id': 3,
@@ -48,10 +48,10 @@ def detail(bot_id):
            'tags': ['#챗봇', '#유머', '#일상']
        },
        2: {
-           "name": "chatbot2",
-           'image': url_for('static', filename='images/chatbot2/thumbnail.png'),
-           "description": "chatbot2의 설명입니다.",
-           'tags': ['#챗봇', '#유머', '#일상']
+           "name": "심야식당",
+           'image': url_for('static', filename='images/chatbot2/기본 웃음.png'),
+           "description": "심야식당의 설명입니다.",
+           'tags': ['#챗봇', '#식당', '#상담']
        },
        3: {
            "name": "chatbot3",
@@ -76,7 +76,7 @@ def detail(bot_id):
 def chat(bot_id):
     chatbot_names = {
         1: "chatbot1",
-        2: "chatbot2",
+        2: "심야식당",
         3: "chatbot3",
         4: "chatbot4"
     }
