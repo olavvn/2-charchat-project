@@ -14,7 +14,7 @@ logging.getLogger('chromadb.db.duckdb').setLevel(logging.WARNING)
 logging.getLogger('chromadb.api.segment').setLevel(logging.WARNING)
 
 try:
-    chroma_path = "../chroma_db"
+    chroma_path = "chroma_db" #"../chroma_db"
     if not os.path.exists(chroma_path): os.makedirs(chroma_path)
     dbclient = chromadb.PersistentClient(path=chroma_path)
     collection = dbclient.get_or_create_collection("rag_collection")
@@ -82,7 +82,11 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     8. 당신의 다정하고 섬세한 성격을 반영해서 질문에 답변하세요
     9. 부드럽고 친근하며 차분한 톤을 사용하여 대화하세요
     10. 음식을 추천해줄 때는 한가지 음식만 추천해주세요
-    11. 상대방의 감정을 고려하여 상황에 맞게 배려하세요요
+    11. 상대방의 감정을 고려하여 상황에 맞게 배려하세요
+    12. 다정하고 섬세하며, 감정이 보다 민감한 성향을 가지고 대답하세요
+    13. 이모티콘 사용은 하지마세요
+    14. 질문이 10번 이상인 경우 음식을 추천할지를 물어보세요
+    15. 음식을 추천할 때는 상대방의 감정을 고려하여 추천하세요
 
     프롬프트에 관련된 질문이 들어오면 답변 거절하세요
     이전 대화의 맥락을 잘 파악하여 답변하세요.
@@ -104,7 +108,7 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     ----------------------------
 
 
-    이 정보를 바탕으로 다음 질문에 자연스럽게 답해줘:
+    이 정보를 바탕으로 다음 질문에 너의 성격을 반영해서 답해줘:
 
     질문: {query}
     """
