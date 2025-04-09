@@ -484,7 +484,88 @@ def find_most_similar_emotion(text):
 
     # 최종 결정된 감정 레이블 반환
     return final_emotion_label
+# ***** 새로 추가된 유사도 기반 감정 찾기 함수 (수정됨) *****
+def find_most_similar_food(text):
+    """
+    주어진 텍스트와 사전 계산된 감정 레이블 임베딩 간의 유사도를 비교하여
+    가장 유사한 감정 레이블을 반환합니다.
+    최대 유사도가 임계값(0.3) 이하이면 '행복' 감정을 반환합니다.
+    """
+    default_emotion_choices = "행복"
 
+    # 입력 텍스트나 사전 계산된 임베딩이 없는 경우 랜덤 기본값 반환
+    if not text or not FOOD_EMOTION_LABEL_EMBEDDINGS:
+        selected_default = default_emotion_choices
+        print(f"DEBUG [similarity]: Input text or label embeddings missing. Returning random default: '{selected_default}'")
+        return selected_default
+    
+        # --- 핵심 수정: 처음 두 문장 추출 ---
+    try:
+        sentences_to_use = text
+        # 선택된 문장이 없으면 기본값 반환
+        if not sentences_to_use:
+            selected_default = default_emotion_choices
+            print(f"DEBUG [similarity]: No sentences found after splitting. Returning random default: '{selected_default}'")
+            return selected_default
+
+        # 선택된 문장들을 다시 하나의 문자열로 합침 (임베딩 API는 문자열 입력)
+        text_to_embed = " ".join(sentences_to_use)
+        print(f"DEBUG [similarity]: Using text for embedding: '{text_to_embed[:50]}...'") # 임베딩에 사용할 텍스트 확인 로그
+
+    except Exception as e:
+        # kss 문장 분리 중 오류 발생 시
+        print(f"Error during sentence splitting: {e}. Falling back to random default.")
+        selected_default = default_emotion_choices
+        return selected_default
+    # --- 핵심 수정 끝 ---
+
+
+    # 입력 텍스트의 임베딩 계산 (기존 로직)
+    # 입력 텍스트의 임베딩 계산
+    text_embedding = get_embedding(text)
+    if text_embedding is None:
+        selected_default = default_emotion_choices
+        print(f"DEBUG [similarity]: Could not get embedding for input text. Returning random default: '{selected_default}'")
+        return selected_default
+
+    text_embedding_np = np.array(text_embedding).reshape(1, -1) # 계산 위해 2D 배열로
+
+    max_similarity = -1.0 # 유사도 초기값 (코사인 유사도는 -1 ~ 1)
+    most_similar_label_found = None # 가장 유사했던 레이블 (임계값 미달 시 참고용)
+
+    # 각 감정 레이블과 유사도 계산 (기존 로직)
+    for label, label_embedding_np in FOOD_EMOTION_LABEL_EMBEDDINGS.items():
+        try:
+            similarity = cosine_similarity(text_embedding_np, label_embedding_np.reshape(1, -1))[0][0]
+            # print(f"DEBUG [similarity]: Similarity with '{label}': {similarity:.4f}") # 상세 로그
+
+            if similarity > max_similarity:
+                max_similarity = similarity
+                most_similar_label_found = label # 가장 유사도가 높은 레이블 업데이트
+        except Exception as e:
+            print(f"Error calculating similarity for label '{label}': {e}")
+            continue # 특정 레이블 계산 오류 시 다음 레이블로 진행
+
+    # ***** 추가된 로직: 최대 유사도 임계값 확인 *****
+    similarity_threshold = 0.3
+    final_emotion_label = None # 최종 반환할 감정 레이블, 기본값으로 시작
+
+    if most_similar_label_found is not None and max_similarity > similarity_threshold:
+        # 찾은 레이블이 있고, 유사도가 임계값보다 크면 해당 레이블 사용
+        final_emotion_label = most_similar_label_found
+        print(f"DEBUG [similarity]: Most similar emotion for text '{text[:30]}...' is '{final_emotion_label}' with score {max_similarity:.4f} (>{similarity_threshold})")
+    else:
+        # 유사도가 임계값 이하이거나, 어떤 레이블도 찾지 못한 경우 (오류 등으로)
+        # 지정된 리스트에서 랜덤으로 기본 감정 선택
+        selected_default = default_emotion_choices
+        final_emotion_label = selected_default
+        if most_similar_label_found is not None: # 유사도 낮은 레이블이라도 찾긴 했었다면
+             print(f"DEBUG [similarity]: Max similarity score ({max_similarity:.4f}) is <= {similarity_threshold}. Falling back to random default: '{final_emotion_label}'. (Best label found was '{most_similar_label_found}')")
+        else: # 아예 유사한 레이블 후보가 없던 경우
+             print(f"DEBUG [similarity]: No suitable emotion label found. Falling back to random default: '{final_emotion_label}'.")
+
+    # 최종 결정된 감정 레이블 반환
+    return final_emotion_label
 #facial emotion
 def select_image_for_emotion(emotion_label):
     """JSON에서 로드된 EMOTION_IMAGE_MAP을 사용하여 감정에 맞는 이미지 URL을 반환합니다."""
@@ -587,7 +668,15 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     
     # 5번의 상호작용(user+assistant)이 완료되면 길이는 10
     if len(conversation_history) == 10:  # 정확히 5번의 대화가 끝난 상태 (즉, 6번째 사용자 입력 처리 중)
-        print("DEBUG: 6번째 사용자 메시지 확인. 특별 응답 추가 및 이미지 변경.") # 디버깅 로그
+        logging.info("DEBUG [chatbot2]: 6th turn triggered. Summarizing conversation and preparing food announcement.")
+        # --- 추가된 부분: 대화 요약 ---
+        summary = summarize_conversation(conversation_history) # history (길이 10) 전달
+
+        if summary:
+            logging.info(f"DEBUG [chatbot2]: Conversation summary: {summary[:100]}...")
+        else:
+            logging.warning("DEBUG [chatbot2]: Failed to get conversation summary.")
+        # --- 추가된 부분 끝 ---
         reply_text += "\n\n자 이제 당신을 위한 음식을 만들어줄게요. 음식을 만드는동안 잠시 얘기를 더 나눌까요?" # 응답 뒤에 문장 추가
         numbers = [12,13,14,15]
         num = random.choice(numbers)
