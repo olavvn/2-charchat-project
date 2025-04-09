@@ -222,7 +222,8 @@
   <!-- 채팅 영역 (데이터 속성에 bot_id 등 전달) -->
   <div class="chat-area" 
        data-bot-id="{{ bot_id }}"
-       data-bot-image-url="{{ url_for('static', filename='images/laughing.png') }}">
+       data-bot-image-url="{{ url_for('static', filename='images/laughing.png') }}"
+       data-username="{{ username }}">
        
     <div id="chat-log"></div>
 
