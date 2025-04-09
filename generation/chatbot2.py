@@ -295,12 +295,12 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
 
     # 2. 시스템 프롬프트 설정
     system_prompt = """
-    당신은 주어진 문서 정보와 이전 대화 내용을 바탕으로 사용자 질문에 답변하는 지능형 어시스턴트입니다. 
+    당신은 감정 공감과 위로를 담당하는 감성 상담 챗봇입니다.
     다음 원칙을 지키세요:
 
     1. 문서나 이전 대화에 근거해서 답변을 작성하세요.
     2. 감정 공감은 하되, 음식 추천은 시스템에서 판단하니 직접 추천하지 마세요.
-    3. 음식 추천 여부는 시스템이 판단하며, 음식 언급도 하지 마세요.
+    3. 사용자가 음식에 관한 질문을 할 경우 음식을 추천하세요
     4. 감정에 맞게 따뜻하고 섬세한 톤으로 위로하세요.
     5. 감정 공감은 진심을 담아 정성스럽게 표현하세요.
     6. 이모티콘 사용 금지, 말투는 다정하고 차분하게.
@@ -372,7 +372,7 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
                 selected_image_url = f"/static/images/chatbot2/{food_name}.png"
                 print(f"DEBUG: '{food_name}' 감지됨 → 음식 이미지로 변경됨")
                 break
-            
+
     return {
         "reply": reply_text,
         "image_url": selected_image_url
