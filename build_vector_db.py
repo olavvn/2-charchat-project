@@ -85,13 +85,28 @@ if __name__ == "__main__":
             doc_id += 1 # 인덱스 하나씩 증가 시키면서
             embedding = get_embedding(chunk) # 각 청크 임베딩 벡터 생성
             # vectorDB에 다음 정보 추가
-            collection.add(
-                documents=[chunk], # 실제 청크 text
-                embeddings=[embedding], # 생성된 임베딩 벡터
-                metadatas=[{"filename": filename, "chunk_index": idx}], # 파일 이름과 청크 인덱스를 포함하는 메타데이터
-                ids=[str(doc_id)] # 각 청크의 Unique한 id 저장
-                # 이 고유 id를 통해 db에서 업데이트, 삭제등의 작업 가능 
-            )
+            if "food" in filename.lower():  # 파일명이 'food' 포함하면 음식 관련으로 판단
+                collection.add(
+                    documents=[chunk],
+                    embeddings=[embedding],
+                    metadatas=[{
+                        "filename": filename,
+                        "chunk_index": idx,
+                        "image_url": f"/static/images/chatbot2/{filename.replace('.txt', '.png')}",
+                        "emotion": "happy"
+                    }],
+                    ids=[str(doc_id)]
+                )
+            else:
+                collection.add(
+                    documents=[chunk],
+                    embeddings=[embedding],
+                    metadatas=[{
+                        "filename": filename,
+                        "chunk_index": idx
+                    }],
+                    ids=[str(doc_id)]
+                )
     # 전처리 과정 
     # do it
     

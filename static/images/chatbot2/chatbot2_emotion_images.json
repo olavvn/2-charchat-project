@@ -1,0 +1,23 @@
+{
+  "감정": {
+    "평온함": "gallery01.png",
+    "놀람": "gallery02.png",
+    "환호": "gallery03.png",
+    "슬픔": "gallery04.png",
+    "우울": "gallery05.png",
+    "즐거움": "gallery06.png",
+    "흥미로움": "gallery07.png",
+    "고민": "gallery09.png",
+    "기본": "gallery11.png",
+    "궁금함": "gallery17.png",
+    "반가움": "gallery18.png"
+  },
+  "행동": {
+    "물 건네기": "gallery08.png",
+    "요리(볶음 요리)": "gallery12.png",
+    "요리(소스 제작)": "gallery13.png",
+    "요리(재료 손질)": "gallery14.png",
+    "요리(불)": "gallery15.png",
+    "음식 전달": "gallery16.png"
+  }
+}
