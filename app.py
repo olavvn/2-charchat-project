@@ -93,6 +93,13 @@ def detail(bot_id):
 # 참고: 채팅 화면 진입 시 이전 기록을 지우고 싶다면 여기서 session.pop(f'history_{bot_id}', None) 호출 가능
 @app.route('/chat/<int:bot_id>')
 def chat(bot_id):
+    # --- 추가된 부분: 채팅 페이지 로드 시 해당 봇의 히스토리 초기화 ---
+    session_key = f'history_{bot_id}'
+    if session_key in session:
+        session.pop(session_key, None)  # 해당 bot_id의 history를 세션에서 제거
+        session.modified = True # 세션 변경 사항 저장 요청 (pop 이후에도 명시하는 것이 안전)
+        print(f"DEBUG [app.py]: Cleared chat history for bot_id {bot_id} because chat page was loaded.")
+    # --- 추가된 부분 끝 ---
     chatbot_names = {
         1: "chatbot1",
         2: "chatbot2",
@@ -135,6 +142,8 @@ def api_chat():
         # print(f"DEBUG: Initialized empty history for {session_key}") # 디버깅용 로그
 
     conversation_history = session[session_key] # 이제 안전하게 접근 가능
+    print(f"DEBUG [app.py]: Passing history with length {len(conversation_history)} to chatbot {bot_id}")
+
     # print(f"DEBUG: Loaded history for {session_key}: {len(conversation_history)} messages") # 디버깅용 로그
 
 
@@ -174,6 +183,8 @@ def api_chat():
         # conversation_history는 이제 session[session_key]와 같은 객체를 참조함
         conversation_history.append({"role": "user", "content": user_message})
         conversation_history.append({"role": "assistant", "content": reply_text_only})
+        print(f"DEBUG [app.py]: History length after update: {len(conversation_history)}")
+
 
         # 기록 길이 제한 적용 (맨 앞의 오래된 기록부터 제거)
         while len(conversation_history) > MAX_SESSION_HISTORY_LENGTH * 2:
