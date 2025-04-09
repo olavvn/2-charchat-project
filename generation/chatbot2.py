@@ -547,7 +547,7 @@ def find_most_similar_food(text):
             continue # 특정 레이블 계산 오류 시 다음 레이블로 진행
 
     # ***** 추가된 로직: 최대 유사도 임계값 확인 *****
-    similarity_threshold = 0.3
+    similarity_threshold = 0.15
     final_emotion_label = None # 최종 반환할 감정 레이블, 기본값으로 시작
 
     if most_similar_label_found is not None and max_similarity > similarity_threshold:
@@ -582,17 +582,45 @@ def select_image_for_emotion(emotion_label):
     return image_url
 
 def select_image_for_emotion_food(emotion_label):
-    """JSON에서 로드된 EMOTION_IMAGE_MAP을 사용하여 감정에 맞는 이미지 URL을 반환합니다."""
-    # EMOTION_IMAGE_MAP이 비어있거나 '기본' 키가 없는 극단적인 경우 대비
-    default_filename = EMOTION_FOOD_MAP.get('행복', '타코야끼.png') # 안전한 기본값
-    # 주어진 감정 레이블로 파일명 조회, 없으면 '기본' 사용
-    filename = EMOTION_FOOD_MAP.get(emotion_label, default_filename)
-    # Flask static 경로 형식으로 반환
-    # ***** 가장 중요! 아래와 같이 수정/확인 *****
-    # 반드시 '/static/' 으로 시작하고 전체 경로를 포함해야 합니다.
+    """
+    EMOTION_FOOD_MAP (음식 정보 딕셔너리)을 사용하여
+    주어진 감정 레이블에 해당하는 음식 이미지 파일명을 찾아 URL을 반환합니다.
+    (JSON 구조: {"감정": {"image": "파일명", "message": "..."}})
+    """
+    # 최종 fallback 이미지 (어떤 이미지도 찾지 못했을 경우 사용)
+    final_fallback_image = "gallery16.png" # 예: 음식 전달 이미지
+
+    # 1. 기본값 설정: '행복' 감정의 이미지를 기본으로 시도
+    default_food_info = EMOTION_FOOD_MAP.get('행복', {}) # '행복' 키가 없으면 빈 dict 반환
+    # '행복' 정보에서 'image' 키 값을 가져오거나, 없으면 최종 fallback 사용
+    default_filename = default_food_info.get('image', final_fallback_image)
+
+    # 2. 주어진 감정 레이블로 정보 조회 및 파일명 추출
+    filename = default_filename # 기본값으로 초기화
+    if emotion_label and isinstance(emotion_label, str): # 유효한 문자열 레이블인지 확인
+        food_info = EMOTION_FOOD_MAP.get(emotion_label) # 해당 감정의 정보 dict 조회
+        if isinstance(food_info, dict):
+             # 정보가 dict 형태이면 'image' 키로 파일명 조회
+             # 만약 'image' 키가 없으면 위에서 설정한 default_filename 사용
+             filename = food_info.get('image', default_filename)
+             logging.info(f"Found food info for '{emotion_label}', using image: {filename}")
+        else:
+             # 해당 감정 키는 있으나 값이 dict가 아닌 경우 (데이터 오류)
+             logging.warning(f"Data for emotion '{emotion_label}' in EMOTION_FOOD_MAP is not a dictionary. Using default image: {filename}")
+             # filename은 이미 default_filename으로 설정되어 있음
+    else:
+        # 주어진 emotion_label이 EMOTION_FOOD_MAP에 없거나 유효하지 않은 경우
+        logging.warning(f"Emotion label '{emotion_label}' not found or invalid in EMOTION_FOOD_MAP. Using default image: {filename}")
+        # filename은 이미 default_filename으로 설정되어 있음
+
+    # 3. Flask static 경로 형식으로 URL 생성
+    # filename 변수에는 최종적으로 선택된 파일명이 들어 있음
     image_url = f"/static/images/chatbot2/{filename}"
 
-    print(f"DEBUG [select_image]: 선택된 파일명: {filename}, 최종 반환 URL: {image_url}") # 확인용 로그 (선택 사항)
+    # 디버깅/정보 로그 (선택 사항)
+    # print(f"DEBUG [select_food_image]: Emotion: '{emotion_label}', Chosen Filename: {filename}, Final URL: {image_url}")
+    logging.info(f"Selected food image URL for emotion '{emotion_label}': {image_url}")
+
     return image_url
 
 def generate_answer_with_context(query, conversation_history, top_k=5):
@@ -666,21 +694,103 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     selected_image_url = select_image_for_emotion(detected_emotion_from_reply) # <<<< 찾은 감정으로 이미지 선택
 
     
-    # 5번의 상호작용(user+assistant)이 완료되면 길이는 10
-    if len(conversation_history) == 10:  # 정확히 5번의 대화가 끝난 상태 (즉, 6번째 사용자 입력 처리 중)
+    # count에 상응하는 시나리오
+    count = len(conversation_history)
+    logging.info(f"DEBUG [chatbot2]: Conversation count: {count}...")
+
+    if count == 10:  # 정확히 5번의 대화가 끝난 상태 (즉, 6번째 사용자 입력 처리 중)
         logging.info("DEBUG [chatbot2]: 6th turn triggered. Summarizing conversation and preparing food announcement.")
+        # --- 추가된 부분 끝 ---
+        reply_text += "\n\n자 이제 당신을 위한 음식을 만들어줄게요. 음식을 만드는동안 잠시 얘기를 더 나눌까요?(예/아니오)로 대답해주세요." # 응답 뒤에 문장 추가
+        numbers = [12,13,14,15]
+        num = random.choice(numbers)
+        selected_image_url = f"/static/images/chatbot2/gallery{num}.png" # 이미지 URL을 gallery14.png로 고정
+    if count == 12:
+        if(query =="예"):
+            numbers = [12,13,14,15]
+            num = random.choice(numbers)
+            selected_image_url = f"/static/images/chatbot2/gallery{num}.png"
+            return {
+                    "reply": "좋아요! 그러면 음식 얘기를 해보죠. 당신은 평소에 어떤 음식을 즐겨 드시나요?",
+                    "image_url": selected_image_url
+                }
+        else:
+            if(query=="아니오"):
+                summary = summarize_conversation(conversation_history[:10]) # history (길이 10) 전달
+                detected_food = find_most_similar_food(summary)
+                selected_food_image_url = select_image_for_emotion_food(detected_food)
+
+                if summary:
+                    logging.info(f"DEBUG [chatbot2]: Conversation summary: {summary[:100]}...")
+                else:
+                    logging.warning("DEBUG [chatbot2]: Failed to get conversation summary.")
+
+                # --- *** 여기에 메시지 조회 로직 추가 *** ---
+                food_reply_message = "지금 당신에게 어떤 위로가 될지 고민했어요." # 기본/Fallback 메시지
+                if detected_food and detected_food in EMOTION_FOOD_MAP:
+                    food_info = EMOTION_FOOD_MAP.get(detected_food) # 음식 정보 가져오기
+                    if isinstance(food_info, dict):
+                        # 'message' 키 값 사용, 없으면 기본 메시지 유지
+                        food_reply_message = food_info.get('message', food_reply_message)
+                    else:
+                        logging.warning(f"Food info for '{detected_food}' in EMOTION_FOOD_MAP is not a dictionary.")
+                else:
+                    # detected_food가 None이거나 EMOTION_FOOD_MAP에 없는 경우
+                    logging.warning(f"Detected food emotion '{detected_food}' not found in EMOTION_FOOD_MAP or summary failed. Using default message.")
+                # --- 메시지 조회 로직 끝 ---
+                count = 0
+                return {
+                        "reply": food_reply_message,
+                        "image_url": selected_food_image_url
+                    }
+                  
+            else:              
+                count = count -2
+            
+    if count == 14:
+        numbers = [12,13,14,15]
+        num = random.choice(numbers)
+        selected_image_url = f"/static/images/chatbot2/gallery{num}.png"
+        return {
+                "reply": reply_text,
+                "image_url": selected_image_url
+            }
+    if count == 16:
+        selected_image_url = "/static/images/chatbot2/gallery16.png"
+        reply_text += "\n\n아 참! 이제 음식이 완성됐어요. 여기있습니다, 손님. (press any key.)" # 응답 뒤에 문장 추가
+        return {
+                "reply": reply_text,
+                "image_url": selected_image_url
+            }
+    if count == 18:
         # --- 추가된 부분: 대화 요약 ---
-        summary = summarize_conversation(conversation_history) # history (길이 10) 전달
+        summary = summarize_conversation(conversation_history[:10]) # history (길이 10) 전달
+        detected_food = find_most_similar_food(summary)
+        selected_food_image_url = select_image_for_emotion_food(detected_food)
 
         if summary:
             logging.info(f"DEBUG [chatbot2]: Conversation summary: {summary[:100]}...")
         else:
             logging.warning("DEBUG [chatbot2]: Failed to get conversation summary.")
-        # --- 추가된 부분 끝 ---
-        reply_text += "\n\n자 이제 당신을 위한 음식을 만들어줄게요. 음식을 만드는동안 잠시 얘기를 더 나눌까요?" # 응답 뒤에 문장 추가
-        numbers = [12,13,14,15]
-        num = random.choice(numbers)
-        selected_image_url = f"/static/images/chatbot2/gallery{num}.png" # 이미지 URL을 gallery14.png로 고정
+
+        # --- *** 여기에 메시지 조회 로직 추가 *** ---
+        food_reply_message = "지금 당신에게 어떤 위로가 될지 고민했어요." # 기본/Fallback 메시지
+        if detected_food and detected_food in EMOTION_FOOD_MAP:
+            food_info = EMOTION_FOOD_MAP.get(detected_food) # 음식 정보 가져오기
+            if isinstance(food_info, dict):
+                # 'message' 키 값 사용, 없으면 기본 메시지 유지
+                food_reply_message = food_info.get('message', food_reply_message)
+            else:
+                logging.warning(f"Food info for '{detected_food}' in EMOTION_FOOD_MAP is not a dictionary.")
+        else:
+            # detected_food가 None이거나 EMOTION_FOOD_MAP에 없는 경우
+            logging.warning(f"Detected food emotion '{detected_food}' not found in EMOTION_FOOD_MAP or summary failed. Using default message.")
+        # --- 메시지 조회 로직 끝 ---
+
+        return {
+                "reply": food_reply_message,
+                "image_url": selected_food_image_url
+            }
     
 
 
