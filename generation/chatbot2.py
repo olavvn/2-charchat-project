@@ -14,6 +14,9 @@ import random
 import kss
 import logging
 
+# --- 전역 변수: 챗봇 대화 기록 및 설정 ---
+CHATBOT2_HISTORY = [] 
+MAX_HISTORY_TURNS = 30 # 턴 기준 (user + assistant = 1턴 * 2 = 기록 2개)
 
 # --- 초기 설정 및 클라이언트 로드 --- 
 load_dotenv()
@@ -584,7 +587,7 @@ def select_image_for_emotion_food(emotion_label):
 
     return image_url
 
-def generate_answer_with_context(query, conversation_history, top_k=5):
+def _internal_generate_answer(query, current_conversation_history, top_k=5):
     if not openai_client: 
         return {
             "reply": "죄송합니다. 챗봇 초기화에 문제가 발생했습니다.",
@@ -622,8 +625,8 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     """
 
     messages = [{"role": "system", "content": system_prompt}]
-    limited_history = conversation_history[-20:]  # 최근 10턴
-    messages.extend(limited_history)
+    #limited_history = current_conversation_history[-20:]  # 최근 10턴
+    messages.extend(current_conversation_history)
 
 
     # user 메시지 구성
@@ -662,17 +665,17 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
 
     
     # count에 상응하는 시나리오
-    count = len(conversation_history)
+    count = len(current_conversation_history)
     logging.info(f"DEBUG [chatbot2]: Conversation count: {count}...")
 
-    if count == 10:  # 정확히 5번의 대화가 끝난 상태 (즉, 6번째 사용자 입력 처리 중)
+    if count == 11:  # 정확히 5번의 대화가 끝난 상태 (즉, 6번째 사용자 입력 처리 중)
         logging.info("DEBUG [chatbot2]: 6th turn triggered. Summarizing conversation and preparing food announcement.")
         # --- 추가된 부분 끝 ---
         reply_text += "\n\n자 이제 당신을 위한 음식을 만들어줄게요. 음식을 만드는동안 잠시 얘기를 더 나눌까요?(예/아니오)로 대답해주세요." # 응답 뒤에 문장 추가
         numbers = [12,13,14,15]
         num = random.choice(numbers)
         selected_image_url = f"/static/images/chatbot2/gallery{num}.png" # 이미지 URL을 gallery14.png로 고정
-    if count == 12:
+    elif count == 13:
         if(query =="예"):
             numbers = [12,13,14,15]
             num = random.choice(numbers)
@@ -681,10 +684,9 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
                     "reply": "좋아요! 그러면 음식 얘기를 해보죠. 당신은 평소에 어떤 음식을 즐겨 드시나요?",
                     "image_url": selected_image_url
                 }
-        else:
-            if(query=="아니오"):
-                summary = summarize_conversation(conversation_history[:10]) # history (길이 10) 전달
-                detected_food = find_most_similar_food(summary)
+        elif(query=="아니오"):
+                summary = summarize_conversation(current_conversation_history[:10]) # history (길이 10) 전달
+                detected_food = find_most_similar_food(summary if summary else "")
                 selected_food_image_url = select_image_for_emotion_food(detected_food)
 
                 if summary:
@@ -705,16 +707,15 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
                     # detected_food가 None이거나 EMOTION_FOOD_MAP에 없는 경우
                     logging.warning(f"Detected food emotion '{detected_food}' not found in EMOTION_FOOD_MAP or summary failed. Using default message.")
                 # --- 메시지 조회 로직 끝 ---
-                count = 0
                 return {
                         "reply": food_reply_message,
                         "image_url": selected_food_image_url
                     }
                   
-            else:              
-                count = count -2
+        else:              
+                logging.info("DEBUG [chatbot2 internal]: count 13, but query is not '예' or '아니오'.")
             
-    if count == 14:
+    elif count == 15:
         numbers = [12,13,14,15]
         num = random.choice(numbers)
         selected_image_url = f"/static/images/chatbot2/gallery{num}.png"
@@ -722,17 +723,17 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
                 "reply": reply_text,
                 "image_url": selected_image_url
             }
-    if count == 16:
+    elif count == 17:
         selected_image_url = "/static/images/chatbot2/gallery16.png"
         reply_text += "\n\n아 참! 이제 음식이 완성됐어요. 여기있습니다, 손님. (press any key.)" # 응답 뒤에 문장 추가
         return {
                 "reply": reply_text,
                 "image_url": selected_image_url
             }
-    if count == 18:
+    if count == 19:
         # --- 추가된 부분: 대화 요약 ---
-        summary = summarize_conversation(conversation_history[:10]) # history (길이 10) 전달
-        detected_food = find_most_similar_food(summary)
+        summary = summarize_conversation(current_conversation_history[:10]) # history (길이 10) 전달
+        detected_food = find_most_similar_food(summary if summary else "")
         selected_food_image_url = select_image_for_emotion_food(detected_food)
 
         if summary:
@@ -767,42 +768,85 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
         "image_url": selected_image_url
     }
 
-# ***** 수정된 Flask 앱 연동 인터페이스 함수 *****
-def generate_response(user_message, conversation_history):
+# --- Flask 앱 연동 인터페이스 함수 (시그니처 변경) ---
+def generate_response(user_message):
     """
     Flask app (app.py)에서 호출하기 위한 메인 인터페이스 함수.
-    이제 app.py로부터 대화 기록(conversation_history)을 전달받아 사용합니다.
+    user_message만 인자로 받고, 전역 변수 CHATBOT2_HISTORY를 사용하여 상태 관리.
+    (주의: 운영 환경에서는 사용 불가)
     """
-    # print(f"[chatbot2.generate_response] Received message: {user_message[:50]}... History length: {len(conversation_history)}") # 디버깅 로그
+    global CHATBOT2_HISTORY # 전역 변수 사용 선언
 
-    top_k_documents = 3 # RAG에 사용할 문서 개수
+    # 1. 사용자 메시지를 전역 히스토리에 추가
+    CHATBOT2_HISTORY.append({"role": "user", "content": user_message})
+    history_len_after_user = len(CHATBOT2_HISTORY) 
 
-    # 핵심 로직 함수 호출 시 전달받은 conversation_history 사용
-    response_data = generate_answer_with_context(
+    logging.info(f"DEBUG [chatbot2 generate_response]: History length after user msg: {len(CHATBOT2_HISTORY)}")
+
+    # 2. 내부 함수 호출 (현재 전역 히스토리 전달)
+    top_k_documents = 3
+    # 내부 함수에 현재 히스토리의 복사본 또는 직접 전달 (여기선 직접 전달)
+    response_data = _internal_generate_answer(
         query=user_message,
-        conversation_history=conversation_history,
+        current_conversation_history=CHATBOT2_HISTORY, 
         top_k=top_k_documents
     )
-    return response_data # 딕셔너리 그대로 반환
 
-# --- 기존의 if __name__ == "__main__": 블록 --- (변경 없음, 직접 실행 시 테스트용)
+    # 3. 챗봇 응답을 전역 히스토리에 추가
+    assistant_reply = response_data.get('reply', '')
+    reset_needed = False # 초기화 필요 여부 플래그
+    # Case 1: 6번째 사용자 입력("아니오") 직후 (history 길이는 11) -> 음식 즉시 반환됨
+    # user_message가 추가된 후 길이가 11이고, 해당 메시지가 "아니오" 인 경우
+    if history_len_after_user == 11 and user_message.strip() == "아니오":
+         reset_needed = True
+         logging.info("DEBUG: Reset needed after this response (count=11, user=no)")
+         
+    # Case 2: 10번째 사용자 입력 직후 (history 길이는 19) -> 최종 음식 반환됨
+    # user_message가 추가된 후 길이가 19인 경우
+    elif history_len_after_user == 19: 
+         reset_needed = True
+         logging.info("DEBUG: Reset needed after this response (count=19)")
+
+    if assistant_reply: # 응답이 있는 경우에만 추가
+        CHATBOT2_HISTORY.append({"role": "assistant", "content": assistant_reply})
+
+    # 4. 전역 히스토리 길이 관리 (오래된 기록 제거)
+    # MAX_HISTORY_TURNS * 2 보다 길이가 길면 제거
+    while len(CHATBOT2_HISTORY) > MAX_HISTORY_TURNS * 2:
+        CHATBOT2_HISTORY.pop(0) # 가장 오래된 user 메시지 제거
+        CHATBOT2_HISTORY.pop(0) # 가장 오래된 assistant 메시지 제거
+        logging.info(f"DEBUG [chatbot2 generate_response]: Trimmed global history.")
+
+    # 5. 음식 추천 후 히스토리 초기화 로직 (필요 시)
+    # count 13 ('아니오') 또는 count 19에서 음식을 제공한 후 히스토리를 초기화해야 함
+    # _internal_generate_answer에서 반환된 메시지를 확인하여 처리 가능
+    #final_reply_msg = response_data.get('reply','')
+    # 예시: 음식 제공 완료 메시지 포함 여부로 판단 (더 정확한 방법 필요할 수 있음)
+    # 6. ***** 조건부 히스토리 초기화 실행 *****
+    if reset_needed:
+        logging.warning("Resetting conversation history after food recommendation scenario.")
+        CHATBOT2_HISTORY = [] # 전역 변수 리스트를 비움
+
+
+
+    logging.info(f"DEBUG [chatbot2 generate_response]: Final history length: {len(CHATBOT2_HISTORY)}")
+    # print("Current Global History:", CHATBOT2_HISTORY) # 필요시 히스토리 내용 확인
+
+    return response_data # 결과 딕셔너리 반환
+
+
+# --- 직접 실행 시 테스트용 코드 (수정) ---
 if __name__ == "__main__":
-    print("\n[Direct Run Mode] 멀티턴 RAG 챗봇 (chatbot2) 테스트 시작 (종료: 'quit' 또는 '종료')")
-    test_conversation_history = []
+    print("\n[Direct Run Mode] 싱글턴 RAG 챗봇 (chatbot2) 테스트 시작 (종료: 'quit' 또는 '종료')")
+    # 테스트 시에는 전역 변수 CHATBOT2_HISTORY가 사용됨
     while True:
         user_input = input("\n당신 (테스트): ")
         if user_input.lower() in ["quit", "종료"]: break
-        # 이제 generate_response는 딕셔너리를 반환함
-        response_data = generate_response(user_input, test_conversation_history)
+        # generate_response는 이제 user_message만 받음
+        response_data = generate_response(user_input) 
         answer = response_data['reply']
         image_url = response_data['image_url']
         print(f"\n챗봇 (테스트): {answer}")
         if image_url:
-            print(f"(표시할 이미지: {image_url})") # 테스트 환경에서는 URL만 출력
-
-        test_conversation_history.append({"role": "user", "content": user_input})
-        # 응답 저장 시 딕셔너리 대신 텍스트만 저장해야 할 수도 있음 (API 호환성 고려)
-        test_conversation_history.append({"role": "assistant", "content": answer})
-        MAX_HISTORY_LENGTH = 15
-        if len(test_conversation_history) > MAX_HISTORY_LENGTH * 2:
-            test_conversation_history = test_conversation_history[-(MAX_HISTORY_LENGTH * 2):]
+            print(f"(표시할 이미지: {image_url})") 
+        # 히스토리 관리는 generate_response 내부에서 처리됨
