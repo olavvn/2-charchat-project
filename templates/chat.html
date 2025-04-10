@@ -180,6 +180,21 @@
       margin-top: 0;
       margin-bottom: 5px;
     }
+    .modal-content-chat2 {
+      background-color: #fff;
+      margin: 2% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 30%;
+      max-width: 1000px;
+      border-radius: 12px;
+      position: relative;
+    }
+    .modal-content-chat2 h2 {
+      margin-top: 0;
+      margin-bottom: 5px;
+      text-align: center;
+    }
     .modal-close {
       position: absolute;
       top: 10px;
@@ -198,6 +213,18 @@
       margin-top: 20px;
     }
     .image-grid img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+    /* 이미지 갤러리 그리드 (2열) */
+    .image-grid-chat2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .image-grid-chat2 img {
       width: 100%;
       height: auto;
       border-radius: 8px;
@@ -222,8 +249,9 @@
   <!-- 채팅 영역 (데이터 속성에 bot_id 등 전달) -->
   <div class="chat-area" 
        data-bot-id="{{ bot_id }}"
-       data-bot-image-url="{{ url_for('static', filename='images/laughing.png') }}">
-       
+       data-bot-image-url="{{ url_for('static', filename='images/laughing.png') }}"
+       data-username="{{ username }}">
+
     <div id="chat-log"></div>
 
     <!-- 채팅 입력 영역 -->
@@ -257,10 +285,11 @@
   </div>
   {% elif bot_id == 2 %}
   <div id="videoModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content-chat2">
       <button class="modal-close" data-close-modal="videoModal">&times;</button>
       <h2>영상 보기</h2>
-      <video controls style="width:100%; border-radius:8px; margin-top: 20px;">
+      <video controls style="display: block; width:75%; border-radius:8px; margin-top: 20px; margin-left: auto; margin-right: auto;">
+        <source src="{{ url_for('static', filename='videos/chatbot2/chatbot2_teaser.mp4') }}" type="video/mp4">
         Your browser does not support the video tag.
       </video>
     </div>
@@ -290,7 +319,7 @@
   <!-- Image Gallery Modal -->
   {% if bot_id == 1 %}
   <div id="imageModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content-chat2">
       <button class="modal-close" data-close-modal="imageModal">&times;</button>
       <h2>그림 보기</h2>
       <div class="image-grid">
@@ -309,10 +338,10 @@
   </div>
   {% elif bot_id == 2 %}
   <div id="imageModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content-chat2">
       <button class="modal-close" data-close-modal="imageModal">&times;</button>
       <h2>그림 보기</h2>
-      <div class="image-grid">
+      <div class="image-grid-chat2">
         <!-- chatbot2의 이미지들 -->
         <img src="{{ url_for('static', filename='images/chatbot2/gallery01.png') }}" alt="Gallery 01">
         <img src="{{ url_for('static', filename='images/chatbot2/gallery02.png') }}" alt="Gallery 02">

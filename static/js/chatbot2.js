@@ -170,8 +170,9 @@ function displayInitialBotMessage() {
   // 이 스크립트(chatbot2.js)는 botId가 2일 때만 로드되므로,
   // botId 체크는 사실상 불필요하지만 명시적으로 남겨둘 수 있습니다.
   if (chatLog && botId === '2') {
-    const initialImageUrl = '/static/images/chatbot2/gallery18.png'; // Flask static 폴더 기준 경로
-    const initialText = "안녕하세요? 심야식당입니다";
+    const userName = chatArea.dataset.username || "손";
+    const initialImageUrl = '/static/images/chatbot2/gallery08.png'; // Flask static 폴더 기준 경로
+    const initialText = `안녕하세요? ${userName}님, 심야식당입니다`;
 
     // 메시지 요소 생성
     const messageElem = document.createElement('div');

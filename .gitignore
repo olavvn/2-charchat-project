@@ -1,4 +1,6 @@
 .env
 .venv
+generation/emotion_embedding.py
 __pycache__
 static/data/
+static/videos/chatbot2/
