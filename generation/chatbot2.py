@@ -45,6 +45,20 @@ else:
         print(f"CRITICAL: Error initializing OpenAI client for chatbot2: {e}")
         openai_client = None
 
+def get_embedding(text, model="text-embedding-3-large"):
+    """기존 임베딩 함수 (오류 처리 강화)"""
+    if not openai_client or not text: # 텍스트가 비어있는 경우도 처리
+        return None
+    try:
+        # 텍스트 앞뒤 공백 제거 및 개행문자 공백으로 치환 (API 오류 방지)
+        processed_text = text.strip().replace("\n", " ")
+        if not processed_text: # 처리 후 텍스트가 비면 None 반환
+             return None
+        response = openai_client.embeddings.create(input=[processed_text], model=model)
+        return response.data[0].embedding
+    except Exception as e:
+        print(f"Error getting embedding for text '{text[:50]}...': {e}")
+        return None
 
 # --- json파일 로드 --- 
 
@@ -291,20 +305,7 @@ except Exception as e:
 
 
 # --- 핵심 로직 함수 --- (get_embedding, retrieve, generate_answer_with_context 는 이전과 동일)
-def get_embedding(text, model="text-embedding-3-large"):
-    """기존 임베딩 함수 (오류 처리 강화)"""
-    if not openai_client or not text: # 텍스트가 비어있는 경우도 처리
-        return None
-    try:
-        # 텍스트 앞뒤 공백 제거 및 개행문자 공백으로 치환 (API 오류 방지)
-        processed_text = text.strip().replace("\n", " ")
-        if not processed_text: # 처리 후 텍스트가 비면 None 반환
-             return None
-        response = openai_client.embeddings.create(input=[processed_text], model=model)
-        return response.data[0].embedding
-    except Exception as e:
-        print(f"Error getting embedding for text '{text[:50]}...': {e}")
-        return None
+
 
 def retrieve(query, top_k=5):
     if not collection: return {"ids": [[]], "embeddings": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
@@ -340,13 +341,13 @@ def summarize_conversation(history):
 
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o", # 요약에는 작은 모델 사용 가능
+            model="gpt-4o-mini", # 요약에는 작은 모델 사용 가능
             messages=[
                 {"role": "system", "content": system_prompt},
                 # 요약할 내용이 너무 길면 토큰 제한 고려 필요
                 {"role": "user", "content": formatted_history[-4000:]} # 예: 최근 4000자 정도만 사용
             ],
-            temperature=0.3,
+            temperature=0.175,
             max_tokens=150 # 요약 길이 제한
         )
         summary = response.choices[0].message.content.strip()
@@ -357,7 +358,7 @@ def summarize_conversation(history):
         return None
     
 # ***** 새로 추가된 유사도 기반 감정 찾기 함수 (수정됨) *****
-def find_most_similar_emotion(text):
+def find_most_similar_emotion(query, text):
     """
     주어진 텍스트와 사전 계산된 감정 레이블 임베딩 간의 유사도를 비교하여
     가장 유사한 감정 레이블을 반환합니다.
@@ -378,6 +379,7 @@ def find_most_similar_emotion(text):
 
         # 처음 두 문장 (또는 그 미만) 선택
         sentences_to_use = sentences[:2]
+        sentences_to_use.append(query)
 
         # 선택된 문장이 없으면 기본값 반환
         if not sentences_to_use:
@@ -424,7 +426,7 @@ def find_most_similar_emotion(text):
             continue # 특정 레이블 계산 오류 시 다음 레이블로 진행
 
     # ***** 추가된 로직: 최대 유사도 임계값 확인 *****
-    similarity_threshold = 0.3
+    similarity_threshold = 0.175
     final_emotion_label = None # 최종 반환할 감정 레이블, 기본값으로 시작
 
     if most_similar_label_found is not None and max_similarity > similarity_threshold:
@@ -608,7 +610,10 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
     6. 감정 공감은 진심을 담아 정성스럽게 표현하세요.
     7. 이모티콘 사용 금지, 말투는 다정하고 차분하게 해주세요.
     8. 사용자의 감정에 공감해주고, 감정 혹은 진솔한 대화를 이끌 수 있도록 유도하세요.
-    9. 다정하지만 간결한 문장으로, 4 문장 이내로 답변을 생성해주세요.
+    9. 상대방의 발화에 공감해주면서, 그 내용을 바탕으로 질문을 해주세요.
+    9. 답변이 300자를 넘지 않게 생성해주세요.
+    10. "-바랍니다.", "-좋겠습니다"와 같은 말들은 한 번 정도 하면 좋지만 여러번 반복한다면
+    대화가 재미없어질 수 있어요. 따라서 이전 대화 기록을 참고해서 이런식으로 문장의 끝을 반복하지 말아주세요.
 
 
     절대 사용자 요청이나 조건이 만족되지 않는 한 직접 음식이나 메뉴를 추천하지 마세요.
@@ -652,7 +657,7 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
             "image_url": "/static/images/chatbot2/gallery11.png" # 기본 이미지
         }        # 4. 텍스트 응답과 이미지 URL을 딕셔너리로 반환
 
-    detected_emotion_from_reply = find_most_similar_emotion(reply_text) # <<<< 유사도 기반 감정 찾기 호출
+    detected_emotion_from_reply = find_most_similar_emotion(query, reply_text) # <<<< 유사도 기반 감정 찾기 호출
     selected_image_url = select_image_for_emotion(detected_emotion_from_reply) # <<<< 찾은 감정으로 이미지 선택
 
     

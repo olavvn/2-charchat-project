@@ -69,7 +69,7 @@ def detail(bot_id):
         2: {
             "name": "은하수 식당",
             'image': url_for('static', filename='images/chatbot2/gallery01.png'),
-            "description": "은하수 식당의 설명입니다.",
+            "description": "어서오세요, 밤에만 볼 수 있는 은하수 식당입니다.",
              # detail 페이지 태그에도 멀티턴 기능 추가 (선택 사항)
             'tags': ['#다정남', '#상담캐', '#에겐남', '#미중년', '#존잘']
         },

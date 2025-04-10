@@ -172,7 +172,7 @@ function displayInitialBotMessage() {
   if (chatLog && botId === '2') {
     const userName = chatArea.dataset.username || "손";
     const initialImageUrl = '/static/images/chatbot2/gallery08.png'; // Flask static 폴더 기준 경로
-    const initialText = `안녕하세요? ${userName}님, 은하수 식당의 월야입니다.`;
+    const initialText = `안녕하세요? ${userName}님, 은하수 식당의 월야입니다. 어떤 이야기를 나누고 싶으세요?`;
 
     // 메시지 요소 생성
     const messageElem = document.createElement('div');
