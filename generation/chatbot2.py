@@ -340,7 +340,7 @@ def summarize_conversation(history):
 
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini", # 요약에는 작은 모델 사용 가능
+            model="gpt-4o", # 요약에는 작은 모델 사용 가능
             messages=[
                 {"role": "system", "content": system_prompt},
                 # 요약할 내용이 너무 길면 토큰 제한 고려 필요
@@ -640,7 +640,7 @@ def generate_answer_with_context(query, conversation_history, top_k=5):
 
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=messages,
             temperature=0.9
         )
