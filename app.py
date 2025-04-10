@@ -1,4 +1,6 @@
 import os
+import sys
+import subprocess
 from flask import Flask, request, render_template, jsonify, url_for, session # session 추가
 from dotenv import load_dotenv
 # app.py 상단에 추가
@@ -34,10 +36,10 @@ def index():
         },
         {
             'id': 2,
-            'name': '심야식당',
+            'name': '은하수 식당',
             'image': url_for('static', filename='images/chatbot2/gallery01.png'),
             # chatbot2 태그 수정하신 것 반영
-            'tags': ['#챗봇', '#상담', '#식당', '#멀티턴기능']
+            'tags': ['#다정남', '#상담캐', '#에겐남', '#미중년', '#존잘']
         },
         {
             'id': 3,
@@ -65,11 +67,11 @@ def detail(bot_id):
             'tags': ['#챗봇', '#유머', '#일상']
         },
         2: {
-            "name": "심야식당",
+            "name": "은하수 식당",
             'image': url_for('static', filename='images/chatbot2/gallery01.png'),
-            "description": "심야식당의 설명입니다.",
+            "description": "은하수 식당의 설명입니다.",
              # detail 페이지 태그에도 멀티턴 기능 추가 (선택 사항)
-            'tags': ['#챗봇', '#상담', '#식당', '#멀티턴기능']
+            'tags': ['#다정남', '#상담캐', '#에겐남', '#미중년', '#존잘']
         },
         3: {
             "name": "chatbot3",
@@ -93,7 +95,7 @@ def detail(bot_id):
 # 참고: 채팅 화면 진입 시 이전 기록을 지우고 싶다면 여기서 session.pop(f'history_{bot_id}', None) 호출 가능
 @app.route('/chat/<int:bot_id>')
 def chat(bot_id):
-    username = request.args.get("username", "손님")
+    username = request.args.get("username", "손")
     # --- 추가된 부분: 채팅 페이지 로드 시 해당 봇의 히스토리 초기화 ---
     session_key = f'history_{bot_id}'
     if session_key in session:
@@ -103,7 +105,7 @@ def chat(bot_id):
     # --- 추가된 부분 끝 ---
     chatbot_names = {
         1: "chatbot1",
-        2: "심야식당",
+        2: "은하수 식당",
         3: "chatbot3",
         4: "chatbot4"
     }
@@ -219,9 +221,33 @@ def api_chat():
         traceback.print_exc()
         return jsonify({'error': f'An unexpected error occurred: {e}'}), 500
 
+
+
 if __name__ == '__main__':
-    # app.run()은 개발용 서버입니다.
-    # debug=True는 코드 변경 시 자동 재시작 및 디버거 활성화 (운영 환경에서는 False)
-    # host='0.0.0.0'은 외부에서 접근 가능하게 함 (필요시 사용)
-    # port=5000은 사용할 포트 (기본값)
+    vector_db_script_path = os.path.join('generation', 'build_vector_db_chatbot2.py')
+    print(f"Attempting to run vector DB build script: {vector_db_script_path}")
+
+    try:
+        # subprocess를 사용하여 build_vector_db_chatbot2.py 실행
+        result = subprocess.run(
+            [sys.executable, vector_db_script_path],
+            check=True, # 오류 발생 시 예외 발생
+            capture_output=True,
+            text=True
+        )
+        print("Vector DB build script executed successfully.")
+        print("Script output:\n", result.stdout)
+    except FileNotFoundError:
+        print(f"Error: The script was not found at {vector_db_script_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing vector DB build script (Return code: {e.returncode}):")
+        print("--- STDOUT ---")
+        print(e.stdout)
+        print("--- STDERR ---")
+        print(e.stderr)
+    except Exception as e:
+        print(f"An unexpected error occurred while trying to run the script: {e}")
+
+    # Flask 개발 서버 실행
+    print("Starting Flask development server...")
     app.run(debug=True)

@@ -172,7 +172,7 @@ function displayInitialBotMessage() {
   if (chatLog && botId === '2') {
     const userName = chatArea.dataset.username || "손";
     const initialImageUrl = '/static/images/chatbot2/gallery08.png'; // Flask static 폴더 기준 경로
-    const initialText = `안녕하세요? ${userName}님, 심야식당입니다`;
+    const initialText = `안녕하세요? ${userName}님, 은하수 식당의 월야입니다.`;
 
     // 메시지 요소 생성
     const messageElem = document.createElement('div');
@@ -182,7 +182,7 @@ function displayInitialBotMessage() {
     const contentImg = document.createElement('img');
     contentImg.classList.add('bot-big-img'); // 기존 클래스 사용
     contentImg.src = initialImageUrl;
-    contentImg.alt = "심야식당";
+    contentImg.alt = "은하수 식당";
     // .bot-big-img 스타일에 따라 표시됨 (max-width: 300px, margin: 0 auto 8px 등)
     messageElem.appendChild(contentImg);
 

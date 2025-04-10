@@ -2,5 +2,5 @@
 .venv
 generation/emotion_embedding.py
 __pycache__
-static/data/
+static/data/chatbot2/chroma_db
 static/videos/chatbot2/
